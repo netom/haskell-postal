@@ -23,6 +23,7 @@ library
       base >= 4.7 && < 5
     , containers
     , bytestring
+    , text
     , template-haskell
     , inline-c
 
@@ -36,6 +37,7 @@ executable haskell_postal
       base >= 4.7 && < 5
     , containers
     , bytestring
+    , text
     , template-haskell
     , inline-c
   other-modules:
