@@ -10,11 +10,12 @@ import Foreign.C.Types
 import qualified Language.C.Inline as C
 import Language.C.Inline.Context as CX
 
-import Foreign.Ptr (Ptr, castPtr)
+import Foreign.Ptr
 
 import Data.ByteString.Internal (fromForeignPtr)
 
 import Foreign.ForeignPtr
+import Control.Monad
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -28,6 +29,9 @@ data AddressParserOptions
 data Options
 data AddressParserResponse
 data Expansions
+
+foreign import ccall "stdlib.h &free"
+    p_free :: FunPtr (Ptr a -> IO ())
 
 -- libpostal_setup()
 setup :: IO Int
@@ -62,43 +66,50 @@ getDefaultOptions = castPtr <$> [C.block|
     } |]
 
 -- libpostal_parse_address()
-parseAddress :: Ptr AddressParserOptions -> T.Text -> IO (Ptr AddressParserResponse)
-parseAddress options address =
-        castPtr <$> [C.exp| void * { libpostal_parse_address($bs-ptr:bsAddress, * (libpostal_address_parser_options_t *) $(void * castedOptions)) } |]
+parseAddress :: Ptr AddressParserOptions -> T.Text -> IO [(T.Text, T.Text)]
+parseAddress options address = do
+        response <- [C.exp| void * { libpostal_parse_address($bs-ptr:bsAddress, * (libpostal_address_parser_options_t *) $(void * castedOptions)) } |]
+
+        when (response == nullPtr) $ fail "libpostal_parse_address returned NULL a pointer"
+
+        numComponents <- [C.exp| int { ((libpostal_address_parser_response_t *) $(void * response))->num_components } |]
+
+        -- TODO: zero length label
+        -- TODO: NULL == malloc()
+        -- TODO: put C functions in actual C files, call those with C.exp-s
+        result <- forM [0..numComponents-1] $ \i -> do
+            (labelLen, labelPtr) <- C.withPtr $ \len -> [C.block| char * {
+                char * srcbuf = ((libpostal_address_parser_response_t *) $(void * response))->labels[$(int i)];
+                *$(size_t * len) = strlen(srcbuf);
+                char * dstbuf = malloc(*$(size_t * len));
+                memcpy(dstbuf, srcbuf, *$(size_t * len));
+                return dstbuf;
+            } |]
+
+            labelFPtr <- newForeignPtr p_free labelPtr
+
+            (compLen, compPtr) <- C.withPtr $ \len -> [C.block| char * {
+                char * srcbuf = ((libpostal_address_parser_response_t *) $(void * response))->components[$(int i)];
+                *$(size_t * len) = strlen(srcbuf);
+                char * dstbuf = malloc(*$(size_t * len));
+                memcpy(dstbuf, srcbuf, *$(size_t * len));
+                return dstbuf;
+            } |]
+
+            compFPtr <- newForeignPtr p_free compPtr
+
+            return
+                ( TE.decodeUtf8 $ fromForeignPtr (castForeignPtr labelFPtr) 0 (fromIntegral labelLen)
+                , TE.decodeUtf8 $ fromForeignPtr (castForeignPtr compFPtr) 0 (fromIntegral compLen)
+                )
+
+        [C.exp| void { libpostal_address_parser_response_destroy((libpostal_address_parser_response_t *) $(void * response)) } |]
+
+        return result
+
         where
             castedOptions = castPtr options
             bsAddress = TE.encodeUtf8 address
-
--- Returns the number of components of an address parser response
-responseNumComponents :: Ptr AddressParserResponse -> IO Int
-responseNumComponents response =
-        fromIntegral <$> [C.exp| int { ((libpostal_address_parser_response_t *) $(void * castedResponse))->num_components } |]
-        where
-            castedResponse = castPtr response
-
--- Returns a response label of an address parser response
-responseLabel :: Ptr AddressParserResponse -> Int -> IO T.Text
-responseLabel response i = do
-    ccptr <- [C.exp| char * { ((libpostal_address_parser_response_t *) $(void * castedResponse))->labels[$(int ci)] } |]
-    strlen <- fromIntegral <$> [C.exp| int { strlen($(char * ccptr)) } |]
-    let w8ptr = castPtr ccptr
-    fw8ptr <- newForeignPtr_ w8ptr
-    return $ TE.decodeUtf8 $ fromForeignPtr fw8ptr 0 strlen
-    where
-        castedResponse = castPtr response
-        ci = fromIntegral i
-
--- Returns a response component of an address parser response
-responseComponent :: Ptr AddressParserResponse -> Int -> IO T.Text
-responseComponent response i = do
-    ccptr <- [C.exp| char * { ((libpostal_address_parser_response_t *) $(void * castedResponse))->components[$(int ci)] } |]
-    strlen <- fromIntegral <$> [C.exp| int { strlen($(char * ccptr)) } |]
-    let w8ptr = castPtr ccptr
-    fw8ptr <- newForeignPtr_ w8ptr
-    return $ TE.decodeUtf8 $ fromForeignPtr fw8ptr 0 strlen
-    where
-        castedResponse = castPtr response
-        ci = fromIntegral i
 
 -- Returns an expansion
 -- withPtr !!!

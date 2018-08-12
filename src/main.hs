@@ -2,32 +2,20 @@
 
 module Main where
 
-import Control.Monad
 import NLP.Postal
-
-import qualified Data.Text as T
 
 main :: IO ()
 main = do
-    putStrLn "Setup"
+    putStrLn "Setting up libpostal..."
     setup >>= print
 
-    putStrLn "Setup parser"
+    putStrLn "Setting up the parser..."
     setupParser >>= print
 
     defOpts <- getAddressParserDefaultOptions
-    rsp <- parseAddress defOpts "1111 Budapest, Kiss Ágoston u. 4/a"
-    ncomps <- responseNumComponents rsp
 
-    putStrLn ""
-    forM_ [0..ncomps-1] $ \i -> do
-        l <- responseLabel rsp i
-        c <- responseComponent rsp i
-        putStrLn $ T.unpack $ l <> ": " <> c
-    putStrLn ""
+    parsedAddress <- parseAddress defOpts "1111 Budapest, Kiss Ágoston u. 4/a"
+    print parsedAddress
 
-    putStrLn "Teardown parser"
     tearDownParser
-
-    putStrLn "Teardown"
     tearDown
