@@ -113,6 +113,8 @@ parseAddress options address = do
 
 -- Returns an expansion
 -- withPtr !!!
+-- TODO: process expansions (char**) to [Text]
+--
 expandAddress :: Ptr Options -> Ptr Int -> T.Text -> IO (Ptr Expansions)
 expandAddress options numExpansions address = do
     ccptr <- [C.exp| void * { libpostal_expand_address($bs-ptr:bsAddress, * (libpostal_normalize_options_t *) $(void * cOptions), $(size_t * cNumExpansions) ) } |]
@@ -121,16 +123,6 @@ expandAddress options numExpansions address = do
         bsAddress = TE.encodeUtf8 address
         cNumExpansions = castPtr numExpansions
         cOptions = castPtr options
-
--- TODO: process expansions (char**) to [Text]
--- TODO: write safet functions (bounds checks, lists of results, etc.)
-
--- libpostal_address_parser_response_destroy()
-responseDestroy :: Ptr AddressParserResponse -> IO ()
-responseDestroy response =
-        [C.exp| void { libpostal_address_parser_response_destroy((libpostal_address_parser_response_t *) $(void * castedResponse)) } |]
-        where
-            castedResponse = castPtr response
 
 -- libpostal_expansion_array_destroy()
 expansionArrayDestroy :: Ptr Expansions -> Int -> IO ()
