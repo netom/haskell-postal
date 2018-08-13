@@ -3,6 +3,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+{-|
+Module      : NLP.Postal
+Description : Haskell binding for the libpostal library
+Copyright   : 2018 Fábián Tamás László
+License     : MIT
+Maintainer  : Fábián Tamás László <giganetom@gmail.com>
+Stability   : alpha
+
+Provides an interface for the libpostal NLP library
+-}
 module NLP.Postal
     ( AddressParserOptions
     , NormalizeOptions

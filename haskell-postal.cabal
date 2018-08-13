@@ -1,12 +1,12 @@
 name:                haskell-postal
-version:             0.2.0.0
+version:             0.2.0.1
 synopsis:            Haskell binding for the libpostal library
 description:         Provides an interface for the libpostal NLP library
 homepage:            https://github.com/netom/haskell-postal#readme
 license:             MIT
 license-file:        LICENSE
-author:              Fábián Tamás László
-maintainer:          giganetom@gmail.com
+author:              Fábián Tamás László <giganetom@gmail.com>
+maintainer:          Fábián Tamás László <giganetom@gmail.com>
 copyright:           2018 Fábián Tamás László
 category:            Natural Language Processing
 build-type:          Simple
