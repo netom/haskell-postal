@@ -140,7 +140,7 @@ parseAddress options address = do
 
         where
             castedOptions = castPtr options
-            bsAddress = TE.encodeUtf8 address
+            bsAddress = TE.encodeUtf8 address <> "\0"
 
 -- |Returns the expansion of an address
 -- Calls libpostal_expand_address() to normalize an address and return the list
@@ -169,7 +169,7 @@ expandAddress options address = do
     return result
 
     where
-        bsAddress = TE.encodeUtf8 address
+        bsAddress = TE.encodeUtf8 address <> "\0"
         cOptions = castPtr options
 
 -- |Calls libpostal_teardown_parser()
