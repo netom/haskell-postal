@@ -31,6 +31,7 @@ module NLP.Postal
 import Data.Monoid ((<>))
 import Foreign.C.Types
 import qualified Language.C.Inline as C
+import qualified Language.C.Inline.Unsafe as CU
 import Language.C.Inline.Context as CX
 
 import Foreign.Ptr
@@ -59,22 +60,22 @@ foreign import ccall "stdlib.h &free" p_free :: FunPtr (Ptr a -> IO ())
 -- |Calls libpostal_setup() to set up the library
 -- Make sure you call this before anything else
 setup :: IO Int
-setup = fromIntegral <$> [C.exp| int { libpostal_setup() } |]
+setup = fromIntegral <$> [CU.exp| int { libpostal_setup() } |]
 
 -- |Calls libpostal_setup_parser() to set up the address parser
 -- Call this before trying to parse addresses
 setupParser :: IO Int
-setupParser = fromIntegral <$> [C.exp| int { libpostal_setup_parser() } |]
+setupParser = fromIntegral <$> [CU.exp| int { libpostal_setup_parser() } |]
 
 -- |Calls libpostal_setup_language_classifier() to set up the classifier
 -- Call this before doing address normaliation
 setupLanguageClassifier :: IO Int
-setupLanguageClassifier =  fromIntegral <$> [C.exp| int { libpostal_setup_language_classifier() } |]
+setupLanguageClassifier =  fromIntegral <$> [CU.exp| int { libpostal_setup_language_classifier() } |]
 
 -- |Returns default parser options
 -- returned by libpostal_get_address_parser_default_options()
 getAddressParserDefaultOptions :: IO (Ptr AddressParserOptions)
-getAddressParserDefaultOptions = castPtr <$> [C.block|
+getAddressParserDefaultOptions = castPtr <$> [CU.block|
     void * {
         libpostal_address_parser_options_t options = libpostal_get_address_parser_default_options();
         void * hoptions = malloc(sizeof(options));
@@ -85,7 +86,7 @@ getAddressParserDefaultOptions = castPtr <$> [C.block|
 -- |Returns default normalizer options
 -- returned by libpostal_get_default_options()
 getDefaultNormalizeOptions :: IO (Ptr NormalizeOptions)
-getDefaultNormalizeOptions = castPtr <$> [C.block|
+getDefaultNormalizeOptions = castPtr <$> [CU.block|
     void * {
         libpostal_normalize_options_t options = libpostal_get_default_options();
         void * hoptions = malloc(sizeof(options));
@@ -98,7 +99,7 @@ getDefaultNormalizeOptions = castPtr <$> [C.block|
 -- parts as a list of key-value tuples (an association list).
 parseAddress :: Ptr AddressParserOptions -> T.Text -> IO [(T.Text, T.Text)]
 parseAddress options address = do
-        response <- [C.exp| void * { libpostal_parse_address($bs-ptr:bsAddress, * (libpostal_address_parser_options_t *) $(void * castedOptions)) } |]
+        response <- [CU.exp| void * { libpostal_parse_address($bs-ptr:bsAddress, * (libpostal_address_parser_options_t *) $(void * castedOptions)) } |]
 
         when (response == nullPtr) $ fail "libpostal_parse_address returned NULL a pointer"
 
@@ -133,7 +134,7 @@ parseAddress options address = do
                 , TE.decodeUtf8 $ fromForeignPtr (castForeignPtr compFPtr) 0 (fromIntegral compLen)
                 )
 
-        [C.exp| void { libpostal_address_parser_response_destroy((libpostal_address_parser_response_t *) $(void * response)) } |]
+        [CU.exp| void { libpostal_address_parser_response_destroy((libpostal_address_parser_response_t *) $(void * response)) } |]
 
         return result
 
@@ -147,7 +148,7 @@ parseAddress options address = do
 expandAddress :: Ptr NormalizeOptions -> T.Text -> IO [T.Text]
 expandAddress options address = do
     (numExpansions, expansions) <- C.withPtr $ \numExpansions ->
-        [C.exp| char * * { libpostal_expand_address($bs-ptr:bsAddress, * (libpostal_normalize_options_t *) $(void * cOptions), $(size_t * numExpansions) ) } |]
+        [CU.exp| char * * { libpostal_expand_address($bs-ptr:bsAddress, * (libpostal_normalize_options_t *) $(void * cOptions), $(size_t * numExpansions) ) } |]
 
     -- TODO: this also turns an array of (char *) to a list of Texts.
     result <- forM [0..numExpansions-1] $ \i -> do
@@ -163,7 +164,7 @@ expandAddress options address = do
 
         return $ TE.decodeUtf8 $ fromForeignPtr (castForeignPtr xpFPtr) 0 (fromIntegral xpLen)
 
-    [C.exp| void { libpostal_expansion_array_destroy($(char * * expansions), $(size_t numExpansions)) } |]
+    [CU.exp| void { libpostal_expansion_array_destroy($(char * * expansions), $(size_t numExpansions)) } |]
 
     return result
 
@@ -173,12 +174,12 @@ expandAddress options address = do
 
 -- |Calls libpostal_teardown_parser()
 tearDownParser :: IO ()
-tearDownParser = [C.exp| void { libpostal_teardown_parser() } |]
+tearDownParser = [CU.exp| void { libpostal_teardown_parser() } |]
 
 -- |Calls libpostal_teardown_language_classifier()
 tearDownLanguageClassifier :: IO ()
-tearDownLanguageClassifier = [C.exp| void { libpostal_teardown_language_classifier() } |]
+tearDownLanguageClassifier = [CU.exp| void { libpostal_teardown_language_classifier() } |]
 
 -- |Calls libpostal_teardown()
 tearDown :: IO ()
-tearDown = [C.exp| void { libpostal_teardown() } |]
+tearDown = [CU.exp| void { libpostal_teardown() } |]
