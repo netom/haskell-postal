@@ -1,0 +1,24 @@
+sudo: false
+
+language: generic
+
+cache:
+  timeout: 1000
+  directories:
+    - $HOME/.stack
+    - $HOME/.libpostal
+    - $HOME/libpostal
+
+addons:
+  apt:
+    packages:
+      - libgmp-dev
+      - curl
+      - autoconf
+      - automake
+      - libtool
+      - pkg-config
+      - git
+
+script:
+- script/ci-build.sh

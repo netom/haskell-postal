@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/netom/haskell-postal.svg?branch=master)](https://travis-ci.org/netom/haskell-postal)
+
 # haskell-postal
 
 Haskell binding for the libpostal library
