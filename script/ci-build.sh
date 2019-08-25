@@ -17,7 +17,7 @@ then
 fi
 
 cd libpostal
-git checkout v1.1-alpha
+git checkout v1.0.0
 ./bootstrap.sh
 ./configure --datadir=$HOME/.libpostal --prefix=$HOME/.local
 make
