@@ -108,31 +108,34 @@ parseAddress options address = do
         -- TODO: zero length label
         -- TODO: NULL == malloc()
         -- TODO: put C functions in actual C files, call those with C.exp-s
-        result <- forM [0..numComponents-1] $ \i -> do
-            (labelLen, labelPtr) <- C.withPtr $ \len -> [C.block| char * {
-                char * srcbuf = ((libpostal_address_parser_response_t *) $(void * response))->labels[$(int i)];
-                *$(size_t * len) = strlen(srcbuf);
-                char * dstbuf = malloc(*$(size_t * len));
-                memcpy(dstbuf, srcbuf, *$(size_t * len));
-                return dstbuf;
-            } |]
+        result <-
+          if(numComponents > 0) then
+            forM [0..numComponents-1] $ \i -> do
+              (labelLen, labelPtr) <- C.withPtr $ \len -> [C.block| char * {
+                  char * srcbuf = ((libpostal_address_parser_response_t *) $(void * response))->labels[$(int i)];
+                  *$(size_t * len) = strlen(srcbuf);
+                  char * dstbuf = malloc(*$(size_t * len));
+                  memcpy(dstbuf, srcbuf, *$(size_t * len));
+                  return dstbuf;
+              } |]
 
-            labelFPtr <- newForeignPtr p_free labelPtr
+              labelFPtr <- newForeignPtr p_free labelPtr
 
-            (compLen, compPtr) <- C.withPtr $ \len -> [C.block| char * {
-                char * srcbuf = ((libpostal_address_parser_response_t *) $(void * response))->components[$(int i)];
-                *$(size_t * len) = strlen(srcbuf);
-                char * dstbuf = malloc(*$(size_t * len));
-                memcpy(dstbuf, srcbuf, *$(size_t * len));
-                return dstbuf;
-            } |]
+              (compLen, compPtr) <- C.withPtr $ \len -> [C.block| char * {
+                  char * srcbuf = ((libpostal_address_parser_response_t *) $(void * response))->components[$(int i)];
+                  *$(size_t * len) = strlen(srcbuf);
+                  char * dstbuf = malloc(*$(size_t * len));
+                  memcpy(dstbuf, srcbuf, *$(size_t * len));
+                  return dstbuf;
+              } |]
 
-            compFPtr <- newForeignPtr p_free compPtr
+              compFPtr <- newForeignPtr p_free compPtr
 
-            return
-                ( TE.decodeUtf8 $ fromForeignPtr (castForeignPtr labelFPtr) 0 (fromIntegral labelLen)
-                , TE.decodeUtf8 $ fromForeignPtr (castForeignPtr compFPtr) 0 (fromIntegral compLen)
-                )
+              return
+                  ( TE.decodeUtf8 $ fromForeignPtr (castForeignPtr labelFPtr) 0 (fromIntegral labelLen)
+                  , TE.decodeUtf8 $ fromForeignPtr (castForeignPtr compFPtr) 0 (fromIntegral compLen)
+                  )
+          else return []
 
         [CU.exp| void { libpostal_address_parser_response_destroy((libpostal_address_parser_response_t *) $(void * response)) } |]
 
@@ -151,19 +154,22 @@ expandAddress options address = do
         [CU.exp| char * * { libpostal_expand_address($bs-ptr:bsAddress, * (libpostal_normalize_options_t *) $(void * cOptions), $(size_t * numExpansions) ) } |]
 
     -- TODO: this also turns an array of (char *) to a list of Texts.
-    result <- forM [0..numExpansions-1] $ \i -> do
-        (xpLen, xpPtr) <- C.withPtr $ \len -> [C.block| char * {
-            char * srcbuf = $(char * * expansions)[$(size_t i)];
-            *$(size_t * len) = strlen(srcbuf);
-            char * dstbuf = malloc(*$(size_t * len));
-            memcpy(dstbuf, srcbuf, *$(size_t * len));
-            return dstbuf;
-        } |]
 
-        xpFPtr <- newForeignPtr p_free xpPtr
+    result <-
+      if numExpansions>0 then
+        forM [0..numExpansions-1] $ \i -> do
+          (xpLen, xpPtr) <- C.withPtr $ \len -> [C.block| char * {
+              char * srcbuf = $(char * * expansions)[$(size_t i)];
+              *$(size_t * len) = strlen(srcbuf);
+              char * dstbuf = malloc(*$(size_t * len));
+              memcpy(dstbuf, srcbuf, *$(size_t * len));
+              return dstbuf;
+          } |]
 
-        return $ TE.decodeUtf8 $ fromForeignPtr (castForeignPtr xpFPtr) 0 (fromIntegral xpLen)
+          xpFPtr <- newForeignPtr p_free xpPtr
 
+          return $ TE.decodeUtf8 $ fromForeignPtr (castForeignPtr xpFPtr) 0 (fromIntegral xpLen)
+      else return []
     [CU.exp| void { libpostal_expansion_array_destroy($(char * * expansions), $(size_t numExpansions)) } |]
 
     return result
